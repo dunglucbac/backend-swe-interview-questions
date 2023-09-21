@@ -126,7 +126,13 @@ We need to write a query that takes advantage of index if any.
 
 ## Complexity of JOIN, INNER JOIN, OUTER JOIN?
 
-To be defined.
+The complexity of JOIN, INNER JOIN, OUTER JOIN depends on the size of the tables, the number of columns, the join conditions, and the indexes available. Generally, the complexity of a join operation is O(M*N), where M and N are the number of rows in the two tables. However, this can be reduced by using indexes, which can speed up the search for matching rows. For example, if one table has an index on the join column, the complexity can be O(M*log N) or O(N*log M), depending on which table is smaller. Some database systems also use hash join or merge join algorithms, which can further improve the performance of join operations. ¹²³
+
+Source: Conversation with Bing, 9/21/2023
+(1) What is the difference between "INNER JOIN" and "OUTER JOIN"?. https://stackoverflow.com/questions/38549/what-is-the-difference-between-inner-join-and-outer-join.
+(2) SQL Query: Complex Inner Joins and Outer Joins - Stack Overflow. https://stackoverflow.com/questions/13831145/sql-query-complex-inner-joins-and-outer-joins.
+(3) Difference Between Inner Join, Cross Join, and Full Outer Join. https://vaishaligoilkar3322.medium.com/difference-between-inner-join-cross-join-and-full-outer-join-3c279a5eeac1.
+(4) SQL | Join (Inner, Left, Right and Full Joins) - GeeksforGeeks. https://www.geeksforgeeks.org/sql-join-set-1-inner-left-right-and-full-joins/.
 
 ## What is Database Replicating? When do we need it?
 
