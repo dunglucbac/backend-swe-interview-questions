@@ -179,7 +179,33 @@ If a timeout occurs and retransmissions do not result in successful delivery, th
 
 ## What will happen if some "packet" is missing on the way?
 
-When a packet is missing, network congestion is assumed to happen. TCP has its own way to deal with network congestion. It is called TCP Congestion control. It starts when slow-start phrase, in which the transmit rate (congestion window) grows exponentially, doubling each round trip time. When a packet is lost, congestion avoidance begins. The transmit rate is cut into half, then increase linearly, usually by 1 each RTT.
+If a packet goes missing in a TCP connection, several steps are taken to ensure reliable data delivery:
+
+1. **Timeout and Retransmission**:
+   - The sender expects to receive an acknowledgment (ACK) from the receiver within a certain timeout period. If the timer expires before the acknowledgment is received, the sender assumes the packet was lost in transit and retransmits it.
+
+2. **Selective Acknowledgment (SACK)**:
+   - In some cases, TCP implementations may use a SACK option to allow the receiver to specify which segments were received successfully and which were not. This provides more granular feedback to the sender, enabling it to retransmit only the necessary segments.
+
+3. **Reassembly and In-Order Delivery**:
+   - TCP uses sequence numbers to ensure that data segments are delivered in the correct order. If a packet arrives out of order, the receiver will hold it until the missing packets are received, ensuring that data is delivered in the correct sequence.
+
+4. **Flow Control and Congestion Control**:
+   - TCP's flow control mechanisms prevent the sender from overwhelming the receiver with data. The receiver advertises a window size, indicating how much data it can currently accept. This helps prevent congestion and reduces the likelihood of missing packets.
+
+5. **Detecting Missing Packets through Acknowledgments**:
+   - When the receiver acknowledges received data, it includes the next expected sequence number. If there are gaps in the received sequence numbers, it indicates that some packets are missing.
+
+6. **Retransmission Timer Adjustments**:
+   - If retransmissions are occurring frequently, TCP's retransmission timer may be adjusted dynamically to adapt to network conditions. For example, if packets are consistently taking longer to be acknowledged, the timer may be increased to allow for longer round-trip times.
+
+7. **Fast Retransmit and Fast Recovery**:
+   - If the sender receives duplicate acknowledgments (indicating that a packet may be lost), it may trigger a fast retransmit to resend the missing packet without waiting for a timeout.
+
+8. **Upper Layer Handling**:
+   - Higher-level protocols or applications may implement their own mechanisms for dealing with missing data. For example, a file transfer protocol may include its own error-checking and retransmission mechanisms.
+
+In summary, TCP is designed to handle missing packets through a combination of retransmissions, reassembly of out-of-order data, and dynamic adjustments to timers and transmission rates. These mechanisms work together to ensure reliable data delivery, even in the presence of network issues or packet loss.
 
 ## How to detect the appropriate number of packets to send (speed of sending packet)?
 
@@ -187,20 +213,136 @@ Like above.
 
 ## How TCP close the connection?
 
-It does a 4-way handshake. Firstly peer A send a FIN packet to peer B. Then peer B send an ACK packet for the FIN it receives. After that peer B send it own FIN packet to peer A. Then peer A send ACK packet to the peer B. Connection is over.
-Step 2 and 3 can be merged by one, so it will be 3-way handshake instead.
+TCP uses a four-way handshake to gracefully close a connection. Here's how the process works:
+
+1. **Initiation of Connection Closure**:
+   - The process of closing a TCP connection begins when one party (either the client or the server) decides it no longer needs the connection and wants to terminate it.
+
+2. **Sending a FIN (Finish) Segment**:
+   - The party initiating the closure sends a TCP segment with the FIN flag set to the other party. This segment indicates that it wants to close the connection for sending data.
+
+3. **Acknowledgment of FIN**:
+   - Upon receiving the FIN segment, the receiving party acknowledges it with an ACK segment. This acknowledges the receipt of the FIN and indicates that it is prepared to close its end of the connection for sending data.
+
+4. **Time-Wait State**:
+   - The party that sent the initial FIN enters a "TIME_WAIT" state. This state ensures that any delayed packets related to the closed connection are handled properly. It also helps prevent confusion with new connections using the same port numbers.
+
+5. **Waiting for Final ACK**:
+   - During the TIME_WAIT state, the party waits for a final acknowledgment (ACK) from the other party to confirm the closure of the connection.
+
+6. **Second FIN and ACK**:
+   - After a brief period in the TIME_WAIT state, the party that received the initial FIN may also decide to close its end of the connection. It sends a FIN segment to the other party.
+
+7. **Acknowledgment of Second FIN**:
+   - The receiving party sends an ACK segment in response to the second FIN, confirming the receipt and indicating its readiness to close its end of the connection.
+
+8. **Connection Closed**:
+   - At this point, the connection is considered closed, and both parties are free to reuse the resources associated with that connection.
+
+The TIME_WAIT state helps prevent potential issues with delayed or duplicate segments related to the closed connection. It's an important part of TCP's reliability and ensures that the connection is closed safely.
+
+It's worth noting that while this four-way handshake is the standard process for closing a TCP connection, there are cases where connections can be abruptly terminated due to network issues or application-level decisions. In such cases, the TIME_WAIT state might not be observed, and the connection may close more abruptly.
 
 ## What if the internet is dropped in the middle of the connection? Or in case one peer is crash?
 
-To be defined
+When unexpected events occur, such as the loss of internet connectivity or a peer crashing during a TCP connection, the behavior and recovery process depend on the specific circumstances:
+
+1. **Loss of Internet Connectivity**:
+
+   - If the internet connection drops abruptly, both peers will eventually realize that they have lost contact with each other.
+   
+   - The TCP connection will enter a timeout state, waiting for acknowledgment packets that will never arrive.
+   
+   - After a period of time (determined by the operating system's TCP/IP stack), the connection will be considered "dead" and the resources associated with it will be released.
+
+   - Any unsent or unacknowledged data will be lost. When the connection is reestablished, a new connection will need to be established.
+
+2. **Peer Crash**:
+
+   - If one of the peers crashes unexpectedly, the other peer will eventually realize that it has lost contact with the crashed peer.
+   
+   - The TCP connection will enter a timeout state, waiting for acknowledgment packets that will never arrive.
+   
+   - Similar to the scenario of a lost internet connection, after a period of time, the connection will be considered "dead" and the resources will be released.
+   
+   - Any unsent or unacknowledged data will be lost.
+
+   - When the crashed peer recovers, it will no longer have any knowledge of the previous connection. If it needs to communicate with the other peer, it will need to establish a new connection.
+
+In both cases, the key point is that TCP is a reliable protocol, but it relies on the underlying network to provide reliable transport. If the network experiences unexpected failures, TCP will do its best to recover, but there are limits to what it can handle.
+
+Additionally, if the application requires higher levels of reliability or fault tolerance, it may need to implement its own mechanisms for dealing with such scenarios, such as application-level acknowledgments, data synchronization, or reconnection strategies.
 
 ## How long you can keep a TCP connection alive?
 
-To be defined
+The duration that a TCP connection can remain open, also known as its "idle timeout" or "inactivity timeout," is determined by various factors, including network configurations, operating system settings, and specific applications or services involved. 
+
+In practice, idle timeouts for TCP connections can range from a few minutes to several hours, depending on the specific environment. Here are some considerations:
+
+1. **Operating System Settings**:
+   - Operating systems have default values for TCP idle timeouts. For example, in some systems, the default idle timeout might be around 2 hours. These values can often be configured or adjusted by system administrators.
+
+2. **Network Devices and Firewalls**:
+   - Network devices, such as routers and firewalls, can also have their own idle timeout settings. These devices might terminate idle connections after a certain period to conserve resources.
+
+3. **Application-Specific Configurations**:
+   - Some applications or services have their own configurable idle timeout settings. For example, web servers, databases, and other network services may have parameters that control how long a connection can remain idle.
+
+4. **Load Balancers and Proxies**:
+   - If a connection passes through load balancers or proxies, these intermediate devices may have their own timeout settings that can impact the duration a connection remains open.
+
+5. **Keep-Alive Mechanisms**:
+   - Many applications implement their own keep-alive mechanisms to prevent idle connections from being terminated. This involves periodically sending small packets or messages to keep the connection active.
+
+6. **Specific Protocols**:
+   - Some protocols, such as HTTP, may have their own mechanisms for controlling how long a connection can remain idle. For example, HTTP/1.1 supports persistent connections that can remain open for multiple requests.
+
+7. **Provider and Infrastructure Policies**:
+   - Cloud providers, ISPs, and other infrastructure services may have their own policies and configurations that impact how long TCP connections can remain open.
+
+8. **Security Considerations**:
+   - Longer idle timeouts can potentially increase the risk of certain types of attacks, such as idle scan attacks or resource exhaustion attacks. Therefore, security policies may influence the duration of idle connections.
+
+Ultimately, the specific duration a TCP connection can remain open will depend on the configurations and policies in place in the particular network environment. It's important for administrators and developers to understand and configure these settings based on the requirements of their applications and services.
 
 ## What are the differences between TCP and UDP? And in which case we use which?
 
-The key difference between TCP and UDP is TCP has a mechanism to resend loss packets, but UDP doesn't. So TCP suits in the case where packet loss can not be acceptable, like transfer file, request... UDP suits in the case packet loss can be tolerated, like in real-time voice/video calls.
+TCP (Transmission Control Protocol) and UDP (User Datagram Protocol) are two of the core protocols in the Internet Protocol (IP) suite. They serve different purposes and have distinct characteristics. Here are the key differences between TCP and UDP:
+
+1. **Connection-Oriented vs. Connectionless**:
+   - **TCP**: Connection-oriented protocol. It establishes a connection before data transmission and ensures reliable delivery through mechanisms like acknowledgments, retransmissions, and flow control.
+   - **UDP**: Connectionless protocol. It does not establish a connection and does not provide reliability or guarantees of delivery. It simply sends data without any verification.
+
+2. **Reliability**:
+   - **TCP**: Provides reliable delivery of data. It guarantees that data will be received in the correct order without errors.
+   - **UDP**: Does not guarantee reliability. Data may be lost, arrive out of order, or contain errors.
+
+3. **Flow Control**:
+   - **TCP**: Implements flow control mechanisms to prevent the sender from overwhelming the receiver with data.
+   - **UDP**: Does not implement flow control. The sender can send data at its own rate, regardless of the receiver's ability to handle it.
+
+4. **Acknowledgment and Retransmission**:
+   - **TCP**: Uses acknowledgments (ACKs) and retransmissions to ensure data delivery. If a segment is not acknowledged within a certain time, it will be retransmitted.
+   - **UDP**: Does not use acknowledgments or retransmissions. It's up to the application to handle any reliability requirements.
+
+5. **Header Size**:
+   - **TCP**: Has a larger header size due to the additional control information required for reliable communication.
+   - **UDP**: Has a smaller header size since it doesn't include the overhead for acknowledgments and sequencing.
+
+6. **Latency**:
+   - **TCP**: Can introduce higher latency due to the establishment of connections, acknowledgments, and retransmissions.
+   - **UDP**: Typically has lower latency because it doesn't have the overhead of connection setup and error recovery.
+
+7. **Use Cases**:
+   - **TCP** is commonly used for applications that require reliable, ordered, and error-checked delivery of data, such as web browsing, email, file transfer, and remote desktop connections.
+   
+   - **UDP** is used for applications where speed and efficiency are more critical than guaranteed delivery, such as real-time multimedia streaming, online gaming, DNS (Domain Name System) queries, and VoIP (Voice over Internet Protocol).
+
+8. **Example Protocols**:
+   - **TCP**: HTTP, HTTPS, FTP, SMTP, Telnet, SSH
+   - **UDP**: DNS, DHCP, SNMP, TFTP, VoIP, online gaming protocols (e.g., UDP-based protocols for games like UDP-based protocols for games like DNS, DHCP, SNMP, TFTP, VoIP, online gaming protocols (e.g., UDP-based protocols for games like UDP-based protocols for games like Fortnite, League of Legends)
+
+In summary, TCP provides reliable, connection-oriented communication with features like reliability, flow control, and error correction. UDP, on the other hand, is faster and more lightweight, making it suitable for applications where speed is crucial, even if it means sacrificing some reliability. The choice between TCP and UDP depends on the specific requirements of the application.
 
 ## How Ping command works? What is TTL? How does TTL will be changed?
 
@@ -210,43 +352,232 @@ Time-to-live is a mechanism that prevents a packet to be forward around the inte
 
 ## How HTTP works?
 
-HTTP is an application protocol that transfers hypertext messages between client and server. It uses specific request methods to perform specific tasks. They include:
+HTTP (Hypertext Transfer Protocol) is a protocol used for communication between a client (such as a web browser) and a web server. It governs the request and response process for fetching and transmitting web resources like HTML pages, images, stylesheets, and more. Here's a basic overview of how HTTP works:
 
-- POST: create a new entity
-- PUT: update an entity entirely
-- PATCH: update an entity partially
-- GET: get value
-- HEAD: get value without data
-- OPTION: get all the methods that the server supports for this resource
-- ...
+1. **Client-Server Interaction**:
+   - HTTP operates on a client-server model, where a client (such as a web browser) sends requests to a web server, which processes the request and returns a response.
+
+2. **Request**:
+   - The process begins with the client sending an HTTP request to a specific URL (Uniform Resource Locator) or URI (Uniform Resource Identifier). The request is composed of:
+     - A method (e.g., GET, POST, PUT, DELETE) that defines the action to be performed.
+     - The path to the requested resource.
+     - Headers containing additional information like user agent, accepted content types, etc.
+     - Optionally, a request body for methods like POST or PUT, which can contain data to be sent to the server.
+
+3. **Server Processing**:
+   - The web server receives the request and processes it based on the provided method, path, and headers. It locates the requested resource on the server.
+
+4. **Resource Retrieval**:
+   - If the request is successful, the server fetches the requested resource (e.g., an HTML file, image, or other content) from its storage.
+
+5. **Response**:
+   - The server constructs an HTTP response, which includes:
+     - A status line indicating the result of the request (e.g., HTTP version, status code, and a brief description).
+     - Headers providing additional information about the response (e.g., content type, date, server type).
+     - The actual content (body) of the response, which contains the requested resource.
+
+6. **Transmission**:
+   - The server transmits the response back to the client over the established TCP connection. This is usually done over port 80 for HTTP or port 443 for HTTPS.
+
+7. **Client Processing**:
+   - The client receives the response and processes it based on the provided status code and content. The browser may render HTML content, display images, execute JavaScript, and perform other actions.
+
+8. **Closure or Persistent Connection**:
+   - In HTTP/1.1 and later versions, connections can be kept open (persistent connections) for multiple requests, improving performance by avoiding the overhead of repeatedly establishing and tearing down connections. This is controlled by the "Connection" header.
+
+9. **Optional Additional Requests**:
+   - The client may issue additional requests for resources referenced within the HTML page (e.g., images, stylesheets, scripts). These additional requests follow the same process.
+
+10. **Session Management (Optional)**:
+    - For applications that require user sessions (e.g., user login, shopping carts), mechanisms like cookies or session IDs are used to maintain state between requests.
+
+HTTP is a stateless protocol, which means each request-response cycle is independent and does not inherently retain information about previous interactions. To handle stateful interactions, techniques like cookies or server-side sessions are used.
+
+Note: HTTPS (HTTP Secure) is a secure version of HTTP that uses encryption (SSL/TLS) to secure the communication between the client and server. It operates on port 443 instead of the standard port 80.
 
 ## Why did people say that HTTP is stateless? The reason they make it stateless?
 
-People say HTTP is stateless because each request is executed independently. Stateless provides high scalability.
+HTTP (Hypertext Transfer Protocol) is considered stateless because each request-response cycle is independent and does not inherently retain information about previous interactions. In other words, the server does not remember past requests from a client.
+
+There are several reasons why HTTP was designed to be stateless:
+
+1. **Simplicity**:
+   - Statelessness simplifies the protocol. It reduces the complexity of handling and managing state information on both the client and server sides.
+
+2. **Scalability**:
+   - Stateless interactions make it easier to scale web applications. Because each request does not rely on past interactions, servers can process requests from different clients in parallel without needing to maintain context for each individual client.
+
+3. **Flexibility**:
+   - Stateless design allows for flexibility in handling requests from various clients and devices. A server does not need to maintain specific information about each client, which makes it more adaptable to a wide range of scenarios.
+
+4. **Fault Tolerance**:
+   - Stateless interactions make it easier to recover from failures. If a server or client encounters an error, it can simply retry the request without having to worry about the state of previous interactions.
+
+5. **Caching**:
+   - Stateless design is conducive to caching. Responses to requests can be easily cached by intermediaries (e.g., proxy servers, CDN edge nodes) to improve performance and reduce the load on origin servers.
+
+6. **Loose Coupling**:
+   - Stateless interactions promote loose coupling between clients and servers. Clients do not need to maintain a continuous connection with the server, which allows for more flexibility in how clients and servers are implemented.
+
+However, while HTTP itself is stateless, many web applications require some form of state to maintain user sessions, track user authentication, and handle activities like shopping carts. To address this, techniques like cookies, session IDs, and application-level session management are used to create and manage stateful interactions on top of the stateless HTTP protocol.
+
+By keeping HTTP stateless at its core, it remains a versatile and adaptable protocol that can serve a wide range of web applications and scenarios, from simple static content delivery to complex interactive web applications.
 
 ## Can we make a persistent HTTP connection? pros and cons of this way?
+Yes, it's possible to establish a persistent HTTP connection, which allows multiple requests and responses to be sent over the same connection. This is commonly referred to as "HTTP Keep-Alive" or "HTTP Persistent Connection."
 
-Yes.
-HTTP persistent connection keeps one connection to send many objects. It can help reduce CPU resources, travel time, network traffic... But resources will be occupied and not be available to others.
+**Pros of Persistent HTTP Connections:**
+
+1. **Reduced Latency**: Persistent connections eliminate the need to repeatedly establish and tear down connections, reducing the overhead associated with connection setup.
+
+2. **Improved Performance**: By reusing existing connections, subsequent requests can be sent and received more quickly, leading to faster overall page loading times.
+
+3. **Resource Efficiency**: Fewer resources are used on both the client and server sides because fewer connections need to be established and maintained.
+
+4. **Reduced Network Congestion**: Fewer connections mean less congestion on the network, which can lead to a smoother experience for users.
+
+5. **Better Use of Server Resources**: The server can handle a higher number of requests per connection, which can be especially beneficial for servers handling a large number of clients.
+
+6. **Better Suited for Modern Web Applications**: Modern web applications often make multiple requests to load resources (e.g., HTML, CSS, JavaScript, images). Persistent connections align well with this behavior.
+
+**Cons of Persistent HTTP Connections:**
+
+1. **Potential for Resource Exhaustion**: If not managed properly, a large number of persistent connections can consume server resources, such as memory and processing power.
+
+2. **Complexity of Connection Management**: Implementing and managing persistent connections can add complexity to both the client and server codebases.
+
+3. **Potential for Connection Pools**: In high-traffic scenarios, managing a pool of connections may be necessary, which adds additional complexity.
+
+4. **Timeouts and Cleanup**: Servers need to implement timeouts and cleanup mechanisms to close idle connections and free up resources.
+
+5. **Load Balancing Challenges**: Some load balancers may not handle persistent connections well, potentially leading to uneven distribution of requests.
+
+6. **Not Supported by All Servers or Clients**: While widely supported, there may be cases where older or specialized servers/clients do not fully support persistent connections.
+
+Overall, while there are some challenges associated with managing persistent connections, the benefits, especially for modern web applications with many resource requests, often outweigh the drawbacks. Properly implemented, persistent connections can significantly improve the performance and efficiency of web applications.
 
 ## Why HTTP require cookie each time we send the request?
 
-No it doesn't required cookie.
+HTTP is a stateless protocol, meaning that each request-response cycle is independent and does not inherently retain information about previous interactions. This statelessness is one of the reasons why HTTP is scalable and efficient, as it allows servers to process requests from different clients in parallel without needing to maintain context for each individual client.
+
+However, there are scenarios where it's necessary to maintain state information between multiple requests. This is where cookies come into play. Cookies are small pieces of data that are sent by the server to the client's browser and are stored on the client's side. The browser then includes the cookie in subsequent requests to the same server.
+
+Here are the reasons why cookies are used and why they need to be sent with each request:
+
+1. **Maintaining Session State**:
+   - Cookies are commonly used to maintain session state. For example, in a web application, when a user logs in, a session is created on the server. A unique session ID is stored in a cookie, allowing the server to associate subsequent requests with the correct session.
+
+2. **Personalization and User Preferences**:
+   - Cookies can be used to remember user preferences or settings. For example, a website might remember a user's preferred language or display options.
+
+3. **Tracking and Analytics**:
+   - Cookies can be used for tracking user behavior on a website. This can be used for analytics, personalization, and targeting of content or advertisements.
+
+4. **Shopping Carts and E-Commerce**:
+   - Cookies are often used in e-commerce websites to maintain a user's shopping cart. The contents of the cart are stored in a cookie, allowing the user to continue shopping without losing their selections.
+
+5. **Authentication and Authorization**:
+   - Cookies are used to maintain authentication information. After a user logs in, a cookie with an authentication token is sent with each subsequent request to verify the user's identity.
+
+6. **Load Balancing and Session Affinity**:
+   - In environments with multiple servers, cookies can be used to maintain session affinity, ensuring that subsequent requests from a client are directed to the same server.
+
+7. **Cross-Site Request Forgery (CSRF) Protection**:
+   - Cookies can be used to mitigate CSRF attacks by including a unique token in each request. This token is checked on the server to verify the authenticity of the request.
+
+8. **Cross-Origin Resource Sharing (CORS)**:
+   - Cookies are used in conjunction with CORS policies to control which domains are allowed to access resources on a web page.
+
+In summary, cookies are a fundamental mechanism for maintaining stateful interactions in a stateless protocol like HTTP. They allow web applications to remember user-specific information and provide a personalized experience. By including cookies in each request, the server can associate the request with the correct user or session.
 
 ## Can someone use your cookie and log in your Facebook account? How to migrate this?
 
-If Facebook stores authentication straight info in cookies normally and does not do anything special, the answer is yes.
-We can mitigate it using HttpOnly flag.
+If someone gains unauthorized access to your cookies, they can potentially use them to impersonate you on websites that rely on cookies for authentication, including social media platforms like Facebook. This is known as a session hijacking or cookie hijacking attack.
+
+To protect against this, it's crucial to take measures to secure your cookies and mitigate the risk of unauthorized access. Here are some steps you can take:
+
+1. **Use HTTPS**:
+   - Always use websites that use HTTPS (SSL/TLS encryption). This encrypts the data in transit, making it much more difficult for attackers to intercept and use your cookies.
+
+2. **Avoid Public Wi-Fi for Sensitive Activities**:
+   - Avoid logging in to sensitive accounts like social media or online banking when connected to unsecured public Wi-Fi networks. If you need to access sensitive accounts while on public Wi-Fi, consider using a Virtual Private Network (VPN) for added security.
+
+3. **Log Out of Accounts**:
+   - Always log out of your accounts when you're finished using them, especially on shared or public computers. This prevents others from gaining access to your session.
+
+4. **Use Private Browsing or Incognito Mode**:
+   - Browsers have a private browsing or incognito mode that doesn't save cookies, history, or other browsing data. This can be useful when using public computers.
+
+5. **Regularly Clear Cookies**:
+   - Periodically clear your browser's cookies and cache. This can help prevent the buildup of potentially sensitive data.
+
+6. **Enable Two-Factor Authentication (2FA)**:
+   - Enable 2FA for your accounts whenever possible. Even if someone gains access to your cookies, they would still need an additional authentication factor to log in.
+
+7. **Monitor Account Activity**:
+   - Regularly review your account activity for any suspicious or unauthorized logins. Most platforms, including Facebook, provide tools to review recent login activity.
+
+8. **Change Passwords Periodically**:
+   - Change your passwords regularly. This can help prevent unauthorized access even if someone gains access to your cookies.
+
+9. **Avoid Clicking on Suspicious Links**:
+   - Be cautious when clicking on links, especially in emails or messages from unknown sources. These links may lead to phishing sites that attempt to steal your login credentials.
+
+10. **Use a Cookie Management Extension**:
+    - Consider using browser extensions or add-ons that provide enhanced cookie management and security features.
+
+If you suspect that your cookies or account have been compromised, take immediate action:
+
+- Change your password.
+- Log out of all active sessions (if the service provides this feature).
+- Review and update your account security settings.
+- Monitor your account for any unusual activity.
+
+By following these steps, you can significantly reduce the risk of unauthorized access to your accounts through cookie hijacking.
 
 ## What is HTTP session? How does authentication work in HTTP? What is JWT?
 
-Cause HTTP is stateless, HTTP session and cookie are two ways to connect some requests together.
+**HTTP Session:**
+An HTTP session is a way to maintain stateful interactions between a client (e.g., web browser) and a server over a series of HTTP requests. It allows the server to remember information about a user's interactions with a website or web application across multiple requests. Sessions are typically used to store user-specific data, such as authentication status, shopping cart contents, and other application-specific information.
 
-Session is created and stored at server side, usually just temporary. Session ID will be sent to client, client may submit it to server as a cookie, or url parameter, so server will know which session this request belongs to. Session ends when user logout, close web browser, or timeout. Session is more secure, compared to cookie.
+Here's how an HTTP session works:
 
-Cookie is stored at client browser. Cookie will expire at the set time.
+1. **Session Creation**: When a user first visits a website, a unique session identifier is generated by the server. This identifier is typically stored in a cookie on the client's browser.
 
-JWT is standard for creating data with opt-in signature and encryption, used for authentication.
+2. **Session Tracking**: On subsequent requests, the client sends the session identifier (usually in a cookie) back to the server. The server uses this identifier to retrieve the user's session data.
+
+3. **Data Storage**: The server can store data related to the session, such as user-specific information or application state, in memory or in a database.
+
+4. **Session Termination**: Sessions can be terminated explicitly (e.g., when a user logs out) or automatically after a period of inactivity (controlled by session timeout settings).
+
+**Authentication in HTTP:**
+Authentication in HTTP involves verifying the identity of a user or system making a request to a server. It's a crucial part of securing web applications and services. There are several methods of authentication, including:
+
+1. **Basic Authentication**:
+   - Basic Authentication involves sending a username and password with each request. However, this method is considered less secure because credentials are sent in plaintext, making them susceptible to interception.
+
+2. **Digest Authentication**:
+   - Digest Authentication is an improvement over Basic Authentication. It involves sending a hashed version of the password with each request, providing a higher level of security.
+
+3. **OAuth**:
+   - OAuth is an open standard for access delegation, commonly used for authorization rather than authentication. It allows a third-party application to access resources on a user's behalf without exposing their credentials.
+
+4. **OAuth 2.0**:
+   - OAuth 2.0 is a widely used authorization framework that allows applications to gain limited access to a user's resources without exposing their credentials.
+
+5. **JWT (JSON Web Tokens)**:
+   - JWT is a compact, URL-safe token format that can be used for securely transmitting information between parties. It is often used for authentication and information exchange. JWTs are digitally signed, ensuring their integrity.
+
+**JWT (JSON Web Tokens):**
+JSON Web Tokens (JWT) are a standard format for representing claims between two parties in a compact and self-contained way. They are commonly used for authentication and information exchange in web applications and APIs. JWTs consist of three parts:
+
+1. **Header**: Contains information about how the token is encoded and signed (e.g., algorithm used for signing).
+2. **Payload**: Contains claims (statements about an entity) encoded in JSON format. Claims can be user information, permissions, expiration time, and more.
+3. **Signature**: Created by combining the header, payload, and a secret key, which ensures the integrity of the token.
+
+JWTs are often used in scenarios where stateless authentication is required. They allow servers to verify the authenticity of a user without the need to maintain a server-side session. When a user logs in, a JWT is generated and sent to the client. The client includes the JWT in the headers of subsequent requests. The server verifies the JWT's signature and uses the information in the payload to authenticate the user.
+
+Overall, JWTs provide a secure and efficient way to handle authentication and information exchange in modern web applications and APIs.
 
 ## Which type of "data" HTTP can help us to get or push? (binary file? image? text file? video file? music file?)
 
