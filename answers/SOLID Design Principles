@@ -1,4 +1,4 @@
-1. Can you explain the SOLID design principles?
+## 1. Can you explain the SOLID design principles?
 The SOLID design principles are a set of guidelines that aim to help developers create more robust and maintainable software. The acronym stands for Single responsibility, Open-closed, Liskov substitution, Interface segregation, and Dependency inversion.
 
 Single responsibility means that each class or module should have a single, well-defined purpose. Open-closed means that code should be open for extension but closed for modification. Liskov substitution means that subclasses should be able to be used in place of their parent class without breaking the code. Interface segregation means that interfaces should be small and focused, and that no client should be forced to depend on methods it does not use. Dependency inversion means that code should depend on abstractions, not concrete implementations.
